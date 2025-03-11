@@ -184,6 +184,9 @@ def upload_file(task_id):
 def view_attachment(file_key):
     file_key = unquote(file_key)
     url = generate_presigned_url(file_key)
+
+    print(f"Generated presigned URL: {url}")
+    
     if url:
         return redirect(url)  # Redirect user to the secure link
     else:
