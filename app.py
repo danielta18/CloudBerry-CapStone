@@ -5,6 +5,7 @@ from flask_migrate import Migrate
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from botocore.exceptions import NoCredentialsError
+from urllib.parse import unquote
 import boto3
 import os
 import time
@@ -181,6 +182,7 @@ def upload_file(task_id):
 @app.route('/view_attachment/<file_key>')
 @login_required
 def view_attachment(file_key):
+    file_key = unquote(file_key)
     url = generate_presigned_url(file_key)
     if url:
         return redirect(url)  # Redirect user to the secure link
