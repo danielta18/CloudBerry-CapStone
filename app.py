@@ -30,13 +30,19 @@ s3_client = boto3.client('s3')
 
 def generate_presigned_url(file_key):
     try:
+        print(f"Generating URL for: {file_key}")  # Debugging output
         url = s3_client.generate_presigned_url(
             'get_object',
             Params={'Bucket': S3_BUCKET, 'Key': file_key},
             ExpiresIn=3600  # Link expires in 1 hour
         )
+        print(f"Presigned URL: {url}")  # Debugging output
         return url
     except NoCredentialsError:
+        print("ERROR: No AWS credentials found.")
+        return None
+    except Exception as e:
+        print(f"ERROR: {e}")
         return None
     
 
@@ -179,15 +185,17 @@ def upload_file(task_id):
     return redirect(url_for('home'))
 
 
-@app.route('/view_attachment/<file_key>')
+@app.route('/view_attachment/<path:file_key>')
 @login_required
 def view_attachment(file_key):
     file_key = unquote(file_key)
+    print(f"Requested file key: {file_key}")
     url = generate_presigned_url(file_key)
 
     print(f"Generated presigned URL: {url}")
-    
+
     if url:
+        print(f"Redirecting to: {url}")
         return redirect(url)  # Redirect user to the secure link
     else:
         flash("Error generating link. Try again.")
