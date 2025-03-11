@@ -1,8 +1,13 @@
-from flask import Flask, request, render_template, redirect, url_for, flash
+from flask import Flask, request, render_template, redirect, url_for, flash, send_file
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from werkzeug.security import generate_password_hash, check_password_hash
+from werkzeug.utils import secure_filename
+from botocore.exceptions import NoCredentialsError
+import boto3
 import os
+import time
+
 
 app = Flask(__name__)
 app.secret_key = 'your_secret_key'  # Change this to a secure key
@@ -15,6 +20,34 @@ db = SQLAlchemy(app)
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
+
+S3_BUCKET = "cloudberrycapstone"
+S3_REGION = "us-east-1"
+s3_client = boto3.client('s3')
+
+def generate_presigned_url(file_key):
+    try:
+        url = s3_client.generate_presigned_url(
+            'get_object',
+            Params={'Bucket': S3_BUCKET, 'Key': file_key},
+            ExpiresIn=3600  # Link expires in 1 hour
+        )
+        return url
+    except NoCredentialsError:
+        return None
+    
+
+def upload_file_to_s3(file, filename):
+    """Uploads a file to S3 and returns the file key (not a public URL)"""
+    try:
+        s3_client.upload_fileobj(
+            file, S3_BUCKET, filename,
+            ExtraArgs={"ACL": "private", "ContentType": file.content_type}
+        )
+        return filename  # Return file key instead of S3 URL
+    except NoCredentialsError:
+        return None
+
 
 class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
@@ -32,6 +65,7 @@ class Task(db.Model):
     title = db.Column(db.String(100), nullable=False)
     completed = db.Column(db.Boolean, default=False)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    attachment_key = db.Column(db.String(255), nullable=True)
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -117,6 +151,40 @@ def edit_task(task_id):
         db.session.commit()
         return redirect(url_for('home'))
     return render_template('edit.html', task=task)
+
+@app.route('/upload/<int:task_id>', methods=['POST'])
+@login_required
+def upload_file(task_id):
+    task = Task.query.filter_by(id=task_id, user_id=current_user.id).first()
+    if not task:
+        flash("Task not found")
+        return redirect(url_for('home'))
+
+    file = request.files['file']
+    if file:
+        timestamp = int(time.time())  # Unique timestamp
+        filename = f"uploads/{current_user.id}/{task_id}_{timestamp}_{secure_filename(file.filename)}"
+        file_key = upload_file_to_s3(file, filename)
+
+        if file_key:
+            task.attachment_key = file_key  # Store file key instead of a direct URL
+            db.session.commit()
+            flash("File uploaded successfully!")
+        else:
+            flash("Error uploading file.")
+    
+    return redirect(url_for('home'))
+
+
+@app.route('/view_attachment/<file_key>')
+@login_required
+def view_attachment(file_key):
+    url = generate_presigned_url(file_key)
+    if url:
+        return redirect(url)  # Redirect user to the secure link
+    else:
+        flash("Error generating link. Try again.")
+        return redirect(url_for('home'))
 
 if __name__ == '__main__':
     with app.app_context():

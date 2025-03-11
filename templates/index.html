@@ -33,10 +33,17 @@
                 <li class="task-item {% if task.completed %}completed{% endif %}">
                     {{ task['title'] }}
                     <div class="button-group">
+                        {% if task.attachment_key %}
+                        <a href="{{ url_for('view_attachment', file_key=task.attachment_key|urlencode) }}" target="_blank">📄 View Attachment</a>
+                        {% endif %}
                         <a href="javascript:void(0);" onclick="confirmDelete({{ task['id'] }})">❌</a>
                         <a href="/edit/{{ task['id'] }}">✏️</a>
                         <a href="/complete/{{ task['id'] }}">✔️</a>
                     </div>
+                    <form action="/upload/{{ task['id'] }}" method="post" enctype="multipart/form-data">
+                        <input type="file" name="file" required>
+                        <button type="submit">Attach File</button>
+                    </form>
                 </li>
             {% endfor %}
         </ul>
