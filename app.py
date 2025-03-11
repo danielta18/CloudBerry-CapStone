@@ -1,6 +1,7 @@
 from flask import Flask, request, render_template, redirect, url_for, flash, send_file
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
+from flask_migrate import Migrate
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from botocore.exceptions import NoCredentialsError
@@ -17,6 +18,7 @@ app.config['SQLALCHEMY_DATABASE_URI'] = 'mysql://admin:Work135!@cloudberry-capst
 app.config['SQLALCHEMY_TRACK_MODIFICATIONS'] = False
 
 db = SQLAlchemy(app)
+migrate = Migrate(app, db)
 login_manager = LoginManager()
 login_manager.init_app(app)
 login_manager.login_view = 'login'
