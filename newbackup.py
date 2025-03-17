@@ -8,7 +8,6 @@ from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from botocore.exceptions import NoCredentialsError
 from urllib.parse import unquote
-from app import mail, db
 from pytz import timezone as pytz_timezone
 import pytz
 import boto3
