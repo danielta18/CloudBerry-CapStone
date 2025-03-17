@@ -14,6 +14,37 @@
                 window.location.href = "/delete/" + taskId;
             }
         }
+        function openReminderPopup(taskId) {
+    document.getElementById("task_id").value = taskId;
+    document.getElementById("reminderPopup").style.display = "block";
+}
+
+function closeReminderPopup() {
+    document.getElementById("reminderPopup").style.display = "none";
+}
+
+document.getElementById("reminderForm").onsubmit = async function(event) {
+    event.preventDefault();
+    
+    const taskId = document.getElementById("task_id").value;
+    const timezone = document.getElementById("timezone").value;
+    const reminderDatetime = document.getElementById("reminder_datetime").value;
+
+    const response = await fetch("/set_reminder", {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json"
+        },
+        body: JSON.stringify({ task_id: taskId, timezone: timezone, reminder_datetime: reminderDatetime })
+    });
+
+    if (response.ok) {
+        alert("Reminder set successfully!");
+        closeReminderPopup();
+    } else {
+        alert("Failed to set reminder.");
+    }
+};
     </script>
 </head>
 <body>
@@ -39,6 +70,9 @@
                         <a href="javascript:void(0);" onclick="confirmDelete({{ task['id'] }})">❌</a>
                         <a href="/edit/{{ task['id'] }}">✏️</a>
                         <a href="/complete/{{ task['id'] }}">✔️</a>
+                        <button class="btn btn-primary" onclick="openReminderPopup({{ task.id }})">
+                            Set Reminder
+                        </button>                        
                     </div>
                     <form action="/upload/{{ task['id'] }}" method="post" enctype="multipart/form-data">
                         <input type="file" name="file" required>
@@ -50,6 +84,30 @@
         {% if task_added %}
             <div id="hideMe">Task Added Successfully</div>
         {% endif %}
+        <div id="reminderPopup" class="modal">
+            <div class="modal-content">
+                <span class="close" onclick="closeReminderPopup()">&times;</span>
+                <h2>Set Reminder</h2>
+        
+                <form id="reminderForm">
+                    <input type="hidden" id="task_id" name="task_id">
+        
+                    <label for="timezone">Timezone:</label>
+                    <select id="timezone" name="timezone">
+                        <option value="UTC">UTC</option>
+                        <option value="America/New_York">Eastern Time (ET)</option>
+                        <option value="America/Chicago">Central Time (CT)</option>
+                        <option value="America/Denver">Mountain Time (MT)</option>
+                        <option value="America/Los_Angeles">Pacific Time (PT)</option>
+                    </select>
+        
+                    <label for="reminder_datetime">Reminder Date & Time:</label>
+                    <input type="datetime-local" id="reminder_datetime" name="reminder_datetime" required>
+        
+                    <button type="submit">Save Reminder</button>
+                </form>
+            </div>
+        </div>        
     </div>
 </body>
 </html>

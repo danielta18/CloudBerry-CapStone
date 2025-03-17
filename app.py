@@ -1,13 +1,19 @@
-from flask import Flask, request, render_template, redirect, url_for, flash, send_file
+from flask import Flask, request, render_template, redirect, url_for, flash, send_file, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_login import LoginManager, UserMixin, login_user, logout_user, login_required, current_user
 from flask_migrate import Migrate
+from flask_mail import Mail, Message
+from datetime import datetime, timezone
 from werkzeug.security import generate_password_hash, check_password_hash
 from werkzeug.utils import secure_filename
 from botocore.exceptions import NoCredentialsError
 from urllib.parse import unquote
+from app import mail, db
+from pytz import timezone as pytz_timezone
+import pytz
 import boto3
 import os
+import threading
 import time
 
 
@@ -27,6 +33,15 @@ login_manager.login_view = 'login'
 S3_BUCKET = "cloudberrycapstone"
 S3_REGION = "us-east-1"
 s3_client = boto3.client('s3')
+
+app.config['MAIL_SERVER'] = 'smtp.gmail.com'
+app.config['MAIL_PORT'] = 587
+app.config['MAIL_USE_TLS'] = True
+app.config['MAIL_USERNAME'] = 'your-email@gmail.com'
+app.config['MAIL_PASSWORD'] = 'your-email-password'  # Use environment variables for security
+app.config['MAIL_DEFAULT_SENDER'] = 'your-email@gmail.com'
+
+mail = Mail(app)
 
 def generate_presigned_url(file_key):
     try:
@@ -61,6 +76,7 @@ def upload_file_to_s3(file, filename):
 class User(db.Model, UserMixin):
     id = db.Column(db.Integer, primary_key=True)
     username = db.Column(db.String(80), unique=True, nullable=False)
+    email = db.Column(db.String(120), unique=True, nullable=False)
     password_hash = db.Column(db.String(200), nullable=False)
 
     def set_password(self, password):
@@ -75,6 +91,40 @@ class Task(db.Model):
     completed = db.Column(db.Boolean, default=False)
     user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
     attachment_key = db.Column(db.String(255), nullable=True)
+    reminder_time = db.Column(db.DateTime, nullable=True)
+
+class Reminder(db.Model):
+    id = db.Column(db.Integer, primary_key=True)
+    user_id = db.Column(db.Integer, db.ForeignKey('user.id'), nullable=False)
+    task_id = db.Column(db.Integer, db.ForeignKey('task.id'), nullable=False)
+    reminder_time = db.Column(db.DateTime, nullable=False)
+    user = db.relationship('User', backref=db.backref('reminders', lazy=True))
+
+def send_reminders():
+    now_utc = datetime.now(pytz.utc)  # Current UTC time
+    reminders = Reminder.query.filter(Reminder.reminder_time <= now_utc).all()
+
+    for reminder in reminders:
+        user = User.query.get(reminder.user_id)
+        task = Task.query.get(reminder.task_id)
+
+        if user and user.email and task:
+            send_email(user.email, "Task Reminder", f"Reminder: Your task '{task.title}' is due!")
+
+            # Remove the reminder after sending
+            db.session.delete(reminder)
+
+    db.session.commit()
+
+def send_email(to, subject, body):
+    try:
+        msg = Message(subject, sender="yourapp@example.com", recipients=[to])
+        msg.body = body
+        mail.send(msg)
+        print(f"Reminder sent to {to}")
+    except Exception as e:
+        print(f"Failed to send email: {e}")
+
 
 @login_manager.user_loader
 def load_user(user_id):
@@ -96,11 +146,12 @@ def login():
 def signup():
     if request.method == 'POST':
         username = request.form['username']
+        email = request.form['email'] 
         password = request.form['password']
-        if User.query.filter_by(username=username).first():
-            flash('Username already exists')
+        if User.query.filter_by(username=username).first() or User.query.filter_by(email=email).first():
+            flash('Username or email already exists')
             return redirect(url_for('signup'))
-        new_user = User(username=username)
+        new_user = User(username=username, email=email)
         new_user.set_password(password)
         db.session.add(new_user)
         db.session.commit()
@@ -200,6 +251,29 @@ def view_attachment(file_key):
     else:
         flash("Error generating link. Try again.")
         return redirect(url_for('home'))
+
+@app.route('/set_reminder', methods=['POST'])
+@login_required
+def set_reminder():
+    data = request.get_json()
+    task_id = data.get("task_id")
+    tz = data.get("timezone")
+    reminder_datetime = data.get("reminder_datetime")
+
+    if not task_id or not tz or not reminder_datetime:
+        return jsonify({"error": "Missing data"}), 400
+
+    # Convert user-selected time to UTC
+    local_tz = pytz_timezone(tz)
+    local_time = datetime.strptime(reminder_datetime, "%Y-%m-%dT%H:%M")
+    utc_time = local_tz.localize(local_time).astimezone(pytz_timezone("UTC"))
+
+    # Save to DB
+    new_reminder = Reminder(user_id=current_user.id, task_id=task_id, reminder_time=utc_time)
+    db.session.add(new_reminder)
+    db.session.commit()
+
+    return jsonify({"message": "Reminder set!"}), 200
 
 if __name__ == '__main__':
     with app.app_context():
