@@ -5,7 +5,8 @@ from botocore.exceptions import NoCredentialsError
 from app.config import Config
 from app.models import Reminder, User, Task, db
 from app.email_utils import send_email
-
+from app import create_app
+from flask import current_app
 
 s3_client = boto3.client('s3')
 
@@ -35,16 +36,18 @@ def upload_file_to_s3(file, filename):
         return None
 
 def send_reminders():
-    now_utc = datetime.now(pytz.utc)
-    reminders = Reminder.query.filter(Reminder.reminder_time <= now_utc).all()
+    # Ensure you're in the app context
+    with create_app().app_context():  # Push application context here
+        now_utc = datetime.now(pytz.utc)
+        reminders = Reminder.query.filter(Reminder.reminder_time <= now_utc).all()
 
-    for reminder in reminders:
-        user = User.query.get(reminder.user_id)
-        task = Task.query.get(reminder.task_id)
+        for reminder in reminders:
+            user = User.query.get(reminder.user_id)
+            task = Task.query.get(reminder.task_id)
 
-        if user and user.email and task:
-            send_email(user.email, "Task Reminder", f"Reminder: Your task '{task.title}' is due!")
+            if user and user.email and task:
+                send_email(user.email, "Task Reminder", f"Reminder: Your task '{task.title}' is due!")
 
-            db.session.delete(reminder)
+                db.session.delete(reminder)
 
-    db.session.commit()
+        db.session.commit()
