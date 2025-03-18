@@ -52,7 +52,7 @@ document.getElementById("reminderForm").onsubmit = async function(event) {
         <h1>{{ username }}'s To-Do List</h1>
         <p>Uncompleted Tasks: {{ uncompleted_tasks_count }}</p>
         <form action="/add" method="post" class="task-form">
-            <input type="text" name="task" placeholder="Enter a task" required>
+            <input type="text" name="title" placeholder="Enter a task" required>
             <button type="submit">Add Task</button>
         </form>
         <div class="button-group">
