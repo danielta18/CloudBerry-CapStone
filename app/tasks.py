@@ -34,7 +34,7 @@ def upload_file_to_s3(file, filename):
         return None
 
 def send_reminders(app):
-    with app().app_context():
+    with app.app_context():
         now_utc = datetime.now(pytz.utc)
         reminders = Reminder.query.filter(Reminder.reminder_time <= now_utc).all()
 
