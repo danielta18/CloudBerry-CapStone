@@ -5,11 +5,9 @@ from botocore.exceptions import NoCredentialsError
 from app.config import Config
 from app.models import Reminder, User, Task, db
 from app.email_utils import send_email
-from app import create_app
 from flask import current_app
 
 s3_client = boto3.client('s3')
-
 
 def generate_presigned_url(file_key):
     try:
@@ -35,9 +33,8 @@ def upload_file_to_s3(file, filename):
     except NoCredentialsError:
         return None
 
-def send_reminders():
-    # Ensure you're in the app context
-    with create_app().app_context():  # Push application context here
+def send_reminders(app):
+    with app.app_context():  # Ensure app context is pushed here
         now_utc = datetime.now(pytz.utc)
         reminders = Reminder.query.filter(Reminder.reminder_time <= now_utc).all()
 
