@@ -13,6 +13,6 @@ class Config:
     MAIL_SERVER = 'smtp.gmail.com'
     MAIL_PORT = 587
     MAIL_USE_TLS = True
-    MAIL_USERNAME = os.getenv("MAIL_USERNAME", "your-email@gmail.com")
-    MAIL_PASSWORD = os.getenv("MAIL_PASSWORD", "your-email-password")
-    MAIL_DEFAULT_SENDER = os.getenv("MAIL_DEFAULT_SENDER", "your-email@gmail.com")
+    MAIL_USERNAME = "todolistreminders2025@gmail.com"
+    MAIL_PASSWORD = "wbez wpay fytu kklf"  # Ensure this is the correct password with spaces
+    MAIL_DEFAULT_SENDER = "todolistreminders2025@gmail.com"
