@@ -5,17 +5,10 @@ from botocore.exceptions import NoCredentialsError
 from app.config import Config
 from app.models import Reminder, User, Task, db
 from app.email_utils import send_email
-from apscheduler.schedulers.background import BackgroundScheduler
-from app.tasks import send_reminders
+
 
 s3_client = boto3.client('s3')
 
-def start_scheduler():
-    scheduler = BackgroundScheduler()
-    scheduler.add_job(send_reminders, 'interval', minutes=1)
-    scheduler.start()
-
-start_scheduler()
 
 def generate_presigned_url(file_key):
     try:
