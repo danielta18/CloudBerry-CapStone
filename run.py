@@ -4,7 +4,7 @@ from app.tasks import send_reminders
 
 app = create_app()
 
-start_reminder_scheduler()
+start_reminder_scheduler(app)
 
 send_reminders(app)
 
