@@ -6,6 +6,8 @@ from app.tasks import upload_file_to_s3, generate_presigned_url, send_reminders
 from urllib.parse import unquote
 from datetime import datetime
 from pytz import timezone as pytz_timezone
+from werkzeug.utils import secure_filename 
+import time  
 
 main_bp = Blueprint('main', __name__)
 
@@ -18,7 +20,7 @@ def login():
         user = User.query.filter_by(username=username).first()
         if user and user.check_password(password):
             login_user(user)
-            return redirect(url_for('home'))
+            return redirect(url_for('main.home'))  
         flash('Invalid credentials')
     return render_template('login.html')
 
@@ -30,20 +32,20 @@ def signup():
         password = request.form['password']
         if User.query.filter_by(username=username).first() or User.query.filter_by(email=email).first():
             flash('Username or email already exists')
-            return redirect(url_for('signup'))
+            return redirect(url_for('main.signup'))  
         new_user = User(username=username, email=email)
         new_user.set_password(password)
         db.session.add(new_user)
         db.session.commit()
         login_user(new_user)
-        return redirect(url_for('home'))
+        return redirect(url_for('main.home'))  
     return render_template('signup.html')
 
 @main_bp.route('/logout')
 @login_required
 def logout():
     logout_user()
-    return redirect(url_for('login'))
+    return redirect(url_for('main.login'))  
 
 @main_bp.route('/')
 @login_required
@@ -60,7 +62,7 @@ def add_task():
     new_task = Task(title=title, user_id=current_user.id)
     db.session.add(new_task)
     db.session.commit()
-    return redirect(url_for('home', task_added=True))
+    return redirect(url_for('main.home', task_added=True))  
 
 @main_bp.route('/delete/<int:task_id>')
 @login_required
@@ -69,7 +71,7 @@ def delete_task(task_id):
     if task:
         db.session.delete(task)
         db.session.commit()
-    return redirect(url_for('home'))
+    return redirect(url_for('main.home'))  
 
 @main_bp.route('/complete/<int:task_id>')
 @login_required
@@ -78,18 +80,18 @@ def complete_task(task_id):
     if task:
         task.completed = True
         db.session.commit()
-    return redirect(url_for('home'))
+    return redirect(url_for('main.home'))  
 
 @main_bp.route('/edit/<int:task_id>', methods=['GET', 'POST'])
 @login_required
 def edit_task(task_id):
     task = Task.query.filter_by(id=task_id, user_id=current_user.id).first()
     if not task:
-        return redirect(url_for('home'))
+        return redirect(url_for('main.home'))  
     if request.method == 'POST':
         task.title = request.form['title']
         db.session.commit()
-        return redirect(url_for('home'))
+        return redirect(url_for('main.home'))  
     return render_template('edit.html', task=task)
 
 @main_bp.route('/upload/<int:task_id>', methods=['POST'])
@@ -98,7 +100,7 @@ def upload_file(task_id):
     task = Task.query.filter_by(id=task_id, user_id=current_user.id).first()
     if not task:
         flash("Task not found")
-        return redirect(url_for('home'))
+        return redirect(url_for('main.home'))  
 
     file = request.files['file']
     if file:
@@ -113,8 +115,7 @@ def upload_file(task_id):
         else:
             flash("Error uploading file.")
     
-    return redirect(url_for('home'))
-
+    return redirect(url_for('main.home'))  
 
 @main_bp.route('/view_attachment/<path:file_key>')
 @login_required
@@ -130,7 +131,7 @@ def view_attachment(file_key):
         return redirect(url)  # Redirect user to the secure link
     else:
         flash("Error generating link. Try again.")
-        return redirect(url_for('home'))
+        return redirect(url_for('main.home'))  
 
 @main_bp.route('/set_reminder', methods=['POST'])
 @login_required
