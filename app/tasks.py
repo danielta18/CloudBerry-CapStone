@@ -49,10 +49,13 @@ def send_reminders(app):
             if user and user.email and task:
                 send_email(user.email, "Task Reminder", f"Reminder: Your task '{task.title}' is due!")
 
-                # Check if the reminder still exists before trying to delete it
-                if db.session.object_session(reminder).is_modified:
-                    db.session.delete(reminder)
+                # Check if the reminder still exists in the database
+                reminder_in_db = Reminder.query.get(reminder.id)
+                if reminder_in_db:
+                    db.session.delete(reminder_in_db)
+                    print(f"Reminder {reminder.id} deleted.")
                 else:
-                    print(f"Reminder {reminder.id} already deleted or not found.")
+                    print(f"Reminder {reminder.id} already deleted or not found in DB.")
 
+        # Commit the session only once after all reminders are processed
         db.session.commit()
