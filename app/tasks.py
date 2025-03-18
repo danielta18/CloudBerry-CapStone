@@ -6,6 +6,7 @@ from app.config import Config
 from app.models import Reminder, User, Task, db
 from app.email_utils import send_email
 from flask import current_app
+from app import create_app
 
 s3_client = boto3.client('s3')
 
@@ -34,7 +35,7 @@ def upload_file_to_s3(file, filename):
         return None
 
 def send_reminders(app):
-    with app.app_context():  # Ensure app context is pushed here
+    with create_app().app_context():
         now_utc = datetime.now(pytz.utc)
         reminders = Reminder.query.filter(Reminder.reminder_time <= now_utc).all()
 
