@@ -10,13 +10,6 @@ from pytz import timezone as pytz_timezone
 main_bp = Blueprint('main', __name__)
 
 # --- Home route ---
-@main_bp.route('/')
-@login_required
-def home():
-    tasks = Task.query.filter_by(user_id=current_user.id).all()
-    return render_template('index.html', tasks=tasks)
-
-# --- Login route ---
 @main_bp.route('/login', methods=['GET', 'POST'])
 def login():
     if request.method == 'POST':
@@ -25,72 +18,58 @@ def login():
         user = User.query.filter_by(username=username).first()
         if user and user.check_password(password):
             login_user(user)
-            return redirect(url_for('main.home'))
+            return redirect(url_for('home'))
         flash('Invalid credentials')
     return render_template('login.html')
 
-# --- Signup route ---
 @main_bp.route('/signup', methods=['GET', 'POST'])
 def signup():
     if request.method == 'POST':
         username = request.form['username']
+        email = request.form['email'] 
         password = request.form['password']
-        email = request.form['email']
-
-        if User.query.filter_by(username=username).first():
-            flash('Username already exists')
-        elif User.query.filter_by(email=email).first():
-            flash('Email already exists')
-        else:
-            user = User(username=username, email=email)
-            user.set_password(password)
-            db.session.add(user)
-            db.session.commit()
-            flash('Account created successfully')
-            return redirect(url_for('main.login'))
-
+        if User.query.filter_by(username=username).first() or User.query.filter_by(email=email).first():
+            flash('Username or email already exists')
+            return redirect(url_for('signup'))
+        new_user = User(username=username, email=email)
+        new_user.set_password(password)
+        db.session.add(new_user)
+        db.session.commit()
+        login_user(new_user)
+        return redirect(url_for('home'))
     return render_template('signup.html')
 
-# --- Logout route ---
 @main_bp.route('/logout')
 @login_required
 def logout():
     logout_user()
-    return redirect(url_for('main.login'))
+    return redirect(url_for('login'))
 
-# --- Add Task Route ---
+@main_bp.route('/')
+@login_required
+def home():
+    tasks = Task.query.filter_by(user_id=current_user.id).all()
+    uncompleted_tasks_count = sum(1 for task in tasks if not task.completed)
+    task_added = request.args.get('task_added', False)
+    return render_template('index.html', tasks=tasks, uncompleted_tasks_count=uncompleted_tasks_count, username=current_user.username, task_added=task_added)
+
 @main_bp.route('/add', methods=['POST'])
 @login_required
 def add_task():
-    """ Add new task """
-    title = request.form['title']
-    description = request.form.get('description', '')
-
-    new_task = Task(
-        title=title,
-        description=description,
-        user_id=current_user.id
-    )
+    title = request.form.get('task')
+    new_task = Task(title=title, user_id=current_user.id)
     db.session.add(new_task)
     db.session.commit()
-    flash('Task added successfully!')
-    return redirect(url_for('main.home'))
+    return redirect(url_for('home', task_added=True))
 
-# --- Edit Task Route ---
-@main_bp.route('/edit/<int:task_id>', methods=['GET', 'POST'])
+@main_bp.route('/delete/<int:task_id>')
 @login_required
-def edit_task(task_id):
-    """ Edit an existing task """
-    task = Task.query.get_or_404(task_id)
-
-    if request.method == 'POST':
-        task.title = request.form['title']
-        task.description = request.form.get('description', '')
+def delete_task(task_id):
+    task = Task.query.filter_by(id=task_id, user_id=current_user.id).first()
+    if task:
+        db.session.delete(task)
         db.session.commit()
-        flash('Task updated successfully!')
-        return redirect(url_for('main.home'))
-
-    return render_template('edit.html', task=task)
+    return redirect(url_for('home'))
 
 @main_bp.route('/complete/<int:task_id>')
 @login_required
@@ -101,40 +80,41 @@ def complete_task(task_id):
         db.session.commit()
     return redirect(url_for('home'))
 
-# --- Delete Task Route ---
-@main_bp.route('/delete/<int:task_id>', methods=['POST'])
+@main_bp.route('/edit/<int:task_id>', methods=['GET', 'POST'])
 @login_required
-def delete_task(task_id):
-    """ Delete a task """
-    task = Task.query.get_or_404(task_id)
-    
-    if task.user_id != current_user.id:
-        flash("Unauthorized action.")
-        return redirect(url_for('main.home'))
+def edit_task(task_id):
+    task = Task.query.filter_by(id=task_id, user_id=current_user.id).first()
+    if not task:
+        return redirect(url_for('home'))
+    if request.method == 'POST':
+        task.title = request.form['title']
+        db.session.commit()
+        return redirect(url_for('home'))
+    return render_template('edit.html', task=task)
 
-    db.session.delete(task)
-    db.session.commit()
-    flash('Task deleted successfully!')
-    return redirect(url_for('main.home'))
-
-# --- Upload file route ---
 @main_bp.route('/upload/<int:task_id>', methods=['POST'])
 @login_required
 def upload_file(task_id):
-    """ Upload a file and attach it to a task """
-    file = request.files['file']
+    task = Task.query.filter_by(id=task_id, user_id=current_user.id).first()
+    if not task:
+        flash("Task not found")
+        return redirect(url_for('home'))
 
+    file = request.files['file']
     if file:
-        filename = f"uploads/{current_user.id}/{task_id}_{datetime.utcnow().timestamp()}_{file.filename}"
+        timestamp = int(time.time())  # Unique timestamp
+        filename = f"uploads/{current_user.id}/{task_id}_{timestamp}_{secure_filename(file.filename)}"
         file_key = upload_file_to_s3(file, filename)
 
         if file_key:
-            task = Task.query.get(task_id)
-            task.attachment_key = file_key
+            task.attachment_key = file_key  # Store file key instead of a direct URL
             db.session.commit()
             flash("File uploaded successfully!")
+        else:
+            flash("Error uploading file.")
     
-    return redirect(url_for('main.home'))
+    return redirect(url_for('home'))
+
 
 @main_bp.route('/view_attachment/<path:file_key>')
 @login_required
@@ -152,69 +132,25 @@ def view_attachment(file_key):
         flash("Error generating link. Try again.")
         return redirect(url_for('home'))
 
-# --- Download file route ---
-@main_bp.route('/download/<int:task_id>')
+@main_bp.route('/set_reminder', methods=['POST'])
 @login_required
-def download_file(task_id):
-    """ Generate a presigned URL to download the file """
-    task = Task.query.get_or_404(task_id)
+def set_reminder():
+    data = request.get_json()
+    task_id = data.get("task_id")
+    tz = data.get("timezone")
+    reminder_datetime = data.get("reminder_datetime")
 
-    if task.attachment_key:
-        presigned_url = generate_presigned_url(task.attachment_key)
-        if presigned_url:
-            return redirect(presigned_url)
-        else:
-            flash('Failed to generate download link.')
-    else:
-        flash('No file attached.')
+    if not task_id or not tz or not reminder_datetime:
+        return jsonify({"error": "Missing data"}), 400
 
-    return redirect(url_for('main.home'))
+    # Convert user-selected time to UTC
+    local_tz = pytz_timezone(tz)
+    local_time = datetime.strptime(reminder_datetime, "%Y-%m-%dT%H:%M")
+    utc_time = local_tz.localize(local_time).astimezone(pytz_timezone("UTC"))
 
-# --- Set Reminder Route ---
-@main_bp.route('/set_reminder/<int:task_id>', methods=['POST'])
-@login_required
-def set_reminder(task_id):
-    """ Set reminder for a task """
-    task = Task.query.get_or_404(task_id)
-    
-    reminder_time_str = request.form['reminder_time']
-    timezone_str = request.form['timezone']
+    # Save to DB
+    new_reminder = Reminder(user_id=current_user.id, task_id=task_id, reminder_time=utc_time)
+    db.session.add(new_reminder)
+    db.session.commit()
 
-    try:
-        local_tz = pytz_timezone(timezone_str)
-        local_time = datetime.strptime(reminder_time_str, "%Y-%m-%dT%H:%M")
-        local_time = local_tz.localize(local_time)
-        utc_time = local_time.astimezone(pytz_timezone('UTC'))
-
-        reminder = Reminder(task_id=task_id, reminder_time=utc_time)
-        db.session.add(reminder)
-        db.session.commit()
-
-        flash('Reminder set successfully!')
-
-    except Exception as e:
-        flash(f'Error setting reminder: {str(e)}')
-
-    return redirect(url_for('main.home'))
-
-# --- Backup Route ---
-@main_bp.route('/backup')
-@login_required
-def backup():
-    """ Backup all tasks to a text file """
-    import os
-
-    tasks = Task.query.filter_by(user_id=current_user.id).all()
-    backup_dir = 'backup'
-    os.makedirs(backup_dir, exist_ok=True)
-
-    backup_file = os.path.join(backup_dir, f"backup_{current_user.id}.txt")
-
-    with open(backup_file, 'w') as f:
-        for task in tasks:
-            f.write(f"Title: {task.title}\n")
-            f.write(f"Description: {task.description}\n")
-            f.write(f"Created At: {task.created_at}\n")
-            f.write("\n---\n\n")
-
-    return send_file(backup_file, as_attachment=True)
+    return jsonify({"message": "Reminder set!"}), 200
