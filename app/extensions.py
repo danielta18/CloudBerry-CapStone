@@ -8,4 +8,4 @@ migrate = Migrate()
 login_manager = LoginManager()
 mail = Mail()
 
-login_manager.login_view = 'login'
+login_manager.login_view = 'main.login'
