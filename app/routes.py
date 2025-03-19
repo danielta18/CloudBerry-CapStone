@@ -155,3 +155,9 @@ def set_reminder():
     db.session.commit()
 
     return jsonify({"message": "Reminder set!"}), 200
+
+@main_bp.route('/uncompleted')
+@login_required
+def show_uncompleted():
+    uncompleted_tasks = Task.query.filter_by(user_id=current_user.id, completed=False).all()
+    return render_template('index.html', tasks=uncompleted_tasks, username=current_user.username)
