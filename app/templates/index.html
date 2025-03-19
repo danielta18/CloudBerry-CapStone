@@ -4,18 +4,13 @@
     <title>{{ username }}'s To-Do List</title>
     <link rel="stylesheet" type="text/css" href="{{ url_for('static', filename='styles.css') }}">
     <script>
-        // Open the popup for a specific task
         function openReminderPopup(taskId) {
             document.getElementById("task_id").value = taskId;
             document.getElementById("reminderPopup").style.display = "block";
         }
-
-        // Close the popup
         function closeReminderPopup() {
             document.getElementById("reminderPopup").style.display = "none";
         }
-
-        // Handle the reminder form submission
         async function submitReminder(event) {
             event.preventDefault();
 
@@ -42,8 +37,6 @@
                 alert("Failed to set reminder.");
             }
         }
-
-        // Attach the submit handler after DOM is loaded
         document.addEventListener("DOMContentLoaded", () => {
             document.getElementById("reminderForm").addEventListener("submit", submitReminder);
         });
@@ -53,20 +46,14 @@
     <div class="container">
         <h1>{{ username }}'s To-Do List</h1>
         <p>Uncompleted Tasks: {{ uncompleted_tasks_count }}</p>
-
-        <!-- Task Form -->
         <form action="/add" method="post" class="task-form">
             <input type="text" name="title" placeholder="Enter a task" required>
             <button type="submit">Add Task</button>
         </form>
-
-        <!-- Filter Buttons -->
         <div class="button-group">
             <button onclick="window.location.href='/uncompleted'">Show Uncompleted Tasks</button>
             <button onclick="window.location.href='/'">Show All Tasks</button>
         </div>
-
-        <!-- Task List -->
         <ul class="task-list">
             {% for task in tasks %}
                 <li class="task-item {% if task.completed %}completed{% endif %}">
@@ -89,13 +76,9 @@
                 </li>
             {% endfor %}
         </ul>
-
-        <!-- Success Message -->
         {% if task_added %}
             <div id="hideMe">Task Added Successfully</div>
         {% endif %}
-
-        <!-- Popup Modal for Setting Reminder -->
         <div id="reminderPopup" class="modal">
             <div class="modal-content">
                 <span class="close" onclick="closeReminderPopup()">&times;</span>
@@ -120,6 +103,14 @@
                 </form>
             </div>
         </div>
+        <div class="logout-container" style="text-align: center; margin-top: 30px;">
+            <form action="{{ url_for('main.logout') }}" method="get">
+                <button type="submit" class="logout-button" style="padding: 10px 20px; background-color: #dc3545; color: white; border: none; cursor: pointer; font-size: 16px;">
+                    Logout
+                </button>
+            </form>
+        </div>
+
     </div>
 </body>
 </html>
