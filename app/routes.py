@@ -58,7 +58,7 @@ def home():
 @main_bp.route('/add', methods=['POST'])
 @login_required
 def add_task():
-    title = request.form.get('task')
+    title = request.form.get('title')
     new_task = Task(title=title, user_id=current_user.id)
     db.session.add(new_task)
     db.session.commit()
